@@ -73,23 +73,23 @@
       } from 'https://cdn.jsdelivr.net/npm/@snap/camera-kit@1.5.0/dist/index.js';
 
       let cameraKitSession = null;
+      let cameraKit = null;
 
-      window.initCameraKit = async function() {
+      window.initCameraKit = async function(stream) {
         try {
-          // Get your API token from: https://camera-kit.snapchat.com/
-          const apiToken = 'eyJhbGciOiJIUzI1NiIsImtpZCI6IkNhbnZhc1MyU0hNQUNQcm9kIiwidHlwIjoiSldUIn0.eyJhdWQiOiJjYW52YXMtY2FudmFzYXBpIiwiaXNzIjoiY2FudmFzLXMyc3Rva2VuIiwibmJmIjoxNzQ3NjQwOTIxLCJzdWIiOiI1YTc1ZTdkMS1mNGIxLTQyNzktYTE5Zi1mNTRlNmUyZThlZTF-U1RBR0lOR34wZDI1OTBhMS03ZTQ1LTQ3YzQtOGNiNy04YjM0OWQ0MzYwMTUifQ.xjb7h3PJeTCtyLheoFn0wywk5K36ninT18aoigb6yXE';
-          const cameraKit = await bootstrapCameraKit({ apiToken });
+          if (!cameraKit) {
+            const apiToken = 'eyJhbGciOiJIUzI1NiIsImtpZCI6IkNhbnZhc1MyU0hNQUNQcm9kIiwidHlwIjoiSldUIn0.eyJhdWQiOiJjYW52YXMtY2FudmFzYXBpIiwiaXNzIjoiY2FudmFzLXMyc3Rva2VuIiwibmJmIjoxNzQ3NjQwOTIxLCJzdWIiOiI1YTc1ZTdkMS1mNGIxLTQyNzktYTE5Zi1mNTRlNmUyZThlZTF-U1RBR0lOR34wZDI1OTBhMS03ZTQ1LTQ3YzQtOGNiNy04YjM0OWQ0MzYwMTUifQ.xjb7h3PJeTCtyLheoFn0wywk5K36ninT18aoigb6yXE';
+            cameraKit = await bootstrapCameraKit({ apiToken });
+          }
 
           const canvas = document.getElementById('video-canvas');
+          
+          if (cameraKitSession) {
+            await cameraKitSession.pause();
+          }
+          
           cameraKitSession = await cameraKit.createSession({
             liveRenderTarget: canvas
-          });
-
-          // Get user's webcam stream
-          const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: {
-              facingMode: window.unityFacingMode
-            }
           });
 
           const source = createMediaStreamSource(stream, {
@@ -99,7 +99,6 @@
 
           await cameraKitSession.setSource(source);
 
-          // Load your lens group
           const { lenses } = await cameraKit.lensRepository.loadLensGroups([
             '46cd05e4-78b1-4661-8633-301ad575998e' // Replace with your lens group ID
           ]);
@@ -111,25 +110,20 @@
           await cameraKitSession.play();
           console.log('Camera Kit session started successfully');
 
-          // Make the stream available for Unity's webcam handling
-          const video = document.querySelector("#webcam-video");
-          video.srcObject = stream;
-          
           return stream;
-
         } catch (error) {
           console.error('Camera Kit initialization failed:', error);
-          ShowError('Failed to initialize Camera Kit: ' + error.message);
           throw error;
         }
       };
 
-      // Modify the existing StartWebcam function to use Camera Kit
       window.StartWebcam = async function() {
         console.log("StartWebcam");
 
         try {
-          window.webcamStream = await window.initCameraKit();
+          window.webcamStream = await navigator.mediaDevices.getUserMedia(window.WEBCAM_SETTINGS);
+          
+          await window.initCameraKit(window.webcamStream);
 
           while (window.requestingForPermissions) {
             console.log("Waiting for permissions...");
@@ -140,6 +134,8 @@
 
           if (window.webcamStream) {
             const video = document.querySelector("#webcam-video");
+            video.srcObject = window.webcamStream;
+            
             try {
               await arCamera.startWebcam(video);
               console.log("Webcam started successfully");
@@ -158,12 +154,11 @@
             window.unityInstance.SendMessage('ARCamera', 'OnStartWebcamFail');
           }
         } catch (error) {
-          console.error("Failed to start Camera Kit:", error);
+          console.error("Failed to start camera:", error);
           ShowError("Failed to start the camera experience");
         }
       };
 
-      // Clean up Camera Kit when stopping webcam
       const originalStopWebcam = window.StopWebcam;
       window.StopWebcam = function() {
         if (cameraKitSession) {
@@ -172,26 +167,23 @@
         originalStopWebcam();
       };
 
-      // Handle camera flipping
       const originalFlipCam = window.FlipCam;
       window.FlipCam = async function() {
         if (cameraKitSession) {
-          cameraKitSession.pause();
+          await cameraKitSession.pause();
         }
         await originalFlipCam();
-        await window.initCameraKit();
+        await window.initCameraKit(window.webcamStream);
       };
     </script>
 
     <script>
-      // Disable double-tap to zoom
       document.addEventListener('touchstart', function (event) {
         if (event.touches.length > 1) {
           event.preventDefault();
         }
       }, { passive: false });
 
-      // Disable pinch to zoom
       document.addEventListener('gesturestart', function (event) {
         event.preventDefault();
       });
@@ -204,13 +196,6 @@
         try{
 					var numFaces = 4;
             
-            // await window.fTracker.initialize(
-                    //     "./opencv.js",
-                    //     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3",
-                    //     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm",
-                    //     "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
-                    //     numFaces);
-
                     await window.fTracker.initialize(
                         "./opencv.js",
                         "./mediapipe/tasks-vision@0.10.3.js",
@@ -246,12 +231,6 @@
       var progressBarFull = document.querySelector("#unity-progress-bar-full");
       var warningBanner = document.querySelector("#unity-warning");
 
-      // Shows a temporary message banner/ribbon for a few seconds, or
-      // a permanent error message on top of the canvas if type=='error'.
-      // If type=='warning', a yellow highlight color is used.
-      // Modify or remove this function to customize the visually presented
-      // way that non-critical warnings and error messages are presented to the
-      // user.
       function unityShowBanner(msg, type) {
         function updateBannerVisibility() {
           warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
@@ -271,7 +250,6 @@
       }
 
       function StartAR() {
-
         var startARDiv = document.querySelector("#startARDiv");
         startARDiv.style.opacity = 0;
         setTimeout(()=>{
@@ -291,15 +269,7 @@
           showBanner: unityShowBanner,
         };
 
-        // By default Unity keeps WebGL canvas render target size matched with
-        // the DOM size of the canvas element (scaled by window.devicePixelRatio)
-        // Set this to false if you want to decouple this synchronization from
-        // happening inside the engine, and you would instead like to size up
-        // the canvas DOM size and WebGL render target sizes yourself.
-        // config.matchWebGLToCanvasSize = false;
-
         if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-          // Mobile device style: fill the whole browser client area with the game canvas:
           var meta = document.createElement('meta');
           meta.name = 'viewport';
           meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
@@ -327,8 +297,7 @@
         document.body.appendChild(script);
       }
 
-      //Set Facing Mode here ('environment', 'user', '')
-		window.unityFacingMode = "user"
+      window.unityFacingMode = "user"
 
       window.WEBCAM_SETTINGS = {
           video: {
@@ -346,11 +315,9 @@
               console.log("Webcam access granted");
               requestingForPermissions = false;
 
-              // Immediately stop the stream to release the camera
               StopWebcam();
           }
           catch (err) {
-              //user denied camera permission - show error panel
               console.error("getUserMedia error - " , err);
               ShowError("Failed to start the experience. Camera permission was denied");
               window.requestingForPermissions = false;
@@ -364,22 +331,18 @@
 
       async function LoadWebcams(){
           let camDevices = [];
-          // let backCams = [];
           let devices = await navigator.mediaDevices.enumerateDevices();
           var ctr = 0;
           devices.forEach(mediaDevice => {
               if (mediaDevice.kind === 'videoinput') {
 
                   if(window.unityFacingMode == 'environment' && !mediaDevice.label.includes('facing front')){
-                      //back cam only
                       camDevices.push(mediaDevice);
                   }
                   else if(window.unityFacingMode == 'user' && mediaDevice.label.includes('facing front')){
-                      //front cam only
                       camDevices.push(mediaDevice);
                   }
                   else{
-                      //back and front
                       camDevices.push(mediaDevice);
                   }   
                   
@@ -389,8 +352,6 @@
           var select = document.getElementById("chooseCamSel");
           select.style.display = "";
           var count = 0;
-          //reverse array because some Android phones can't distinguish front and back cams at first load
-          //and when this happens, most of the time, front cam goes first and back cam goes last
           camDevices = camDevices.reverse();
           camDevices.forEach(mediaDevice => {
               const option = document.createElement('option');
@@ -410,7 +371,6 @@
           var select = document.getElementById("chooseCamSel");
           window.deviceId = select.value;
           window.WEBCAM_SETTINGS.video['deviceId'] = deviceId;
-          //console.log(window.WEBCAM_SETTINGS);
           fTracker.WEBCAM_NAME = select.options[select.selectedIndex].innerHTML;
       }
 
@@ -421,7 +381,6 @@
           }
 
           try {
-              // Query the status of the camera permission
               const permissionStatus = await navigator.permissions.query({ name: "camera" });
               if (permissionStatus.state === "granted") {
               console.log("Camera permission has already been granted.");
@@ -481,7 +440,6 @@
       }
 
       window.FTRACKER_GLOBALS = {
-          //place global settings here
       }
     </script>
   </body>
