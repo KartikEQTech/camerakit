@@ -1,0 +1,3 @@
+<unityWebRequest>
+  <domain name="*" insecure="true" />
+</unityWebRequest>
