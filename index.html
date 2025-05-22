@@ -19,7 +19,6 @@
     </style>
   </head>
   <body>
-
     <video id="webcam-video" muted autoplay playsinline style="width:1px;position:absolute"></video>
     <canvas id="video-canvas" style="width:100%; height:100%; object-fit:cover; position:absolute"></canvas>
     <div id="startARDiv" class="ctaDiv" style="background: #2f2e32">
@@ -42,8 +41,7 @@
           </div>
     </div>
     <div id="confirmUrlDiv" style="display: none; opacity: 0;" class="ctaDiv">
-        <div style="position:relative; background-color:#2c2b2f; padding:10px; box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.3), 0 6px 20px 0 rgba(0, 0, 0, 0.25); width: min(80vw,80vh); display:flex; flex-direction: column; align-items: center; border-radius: 1.5vh;
-">
+        <div style="position:relative; background-color:#2c2b2f; padding:10px; box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.3), 0 6px 20px 0 rgba(0, 0, 0, 0.25); width: min(80vw,80vh); display:flex; flex-direction: column; align-items: center; border-radius: 1.5vh;">
             <p id="confirmUrlText" style="text-align: center; width:80%; overflow: hidden; text-overflow: ellipsis;">Are you sure you want to visit url.com?</p>
             <div style="width: 100%">
                 <button style="width: 100%; margin-bottom: 15px;" onclick="window.open(newUrlString, '_blank').focus(); HideConfirmUrl()">VISIT SITE</button>
@@ -68,52 +66,122 @@
     <script src="ftracker.js" type="text/javascript"></script>
 
     <script type="module">
-    import {
-      bootstrapCameraKit,
-      createMediaStreamSource,
-      Transform2D
-    } from 'https://cdn.jsdelivr.net/npm/@snap/camera-kit@1.5.0/dist/index.js';
+      import {
+        bootstrapCameraKit,
+        createMediaStreamSource,
+        Transform2D
+      } from 'https://cdn.jsdelivr.net/npm/@snap/camera-kit@1.5.0/dist/index.js';
 
-    (async () => {
-      try {
-        // 1. Bootstrap the SDK
-        const apiToken = 'eyJhbGciOiJIUzI1NiIsImtpZCI6IkNhbnZhc1MyU0hNQUNQcm9kIiwidHlwIjoiSldUIn0.eyJhdWQiOiJjYW52YXMtY2FudmFzYXBpIiwiaXNzIjoiY2FudmFzLXMyc3Rva2VuIiwibmJmIjoxNzQ3NjQwOTIxLCJzdWIiOiI1YTc1ZTdkMS1mNGIxLTQyNzktYTE5Zi1mNTRlNmUyZThlZTF-U1RBR0lOR34wZDI1OTBhMS03ZTQ1LTQ3YzQtOGNiNy04YjM0OWQ0MzYwMTUifQ.xjb7h3PJeTCtyLheoFn0wywk5K36ninT18aoigb6yXE';
-        const cameraKit = await bootstrapCameraKit({ apiToken });  
-        // :contentReference[oaicite:0]{index=0}
+      let cameraKitSession = null;
 
-        // 2. Create a session rendering to our <canvas>
-        const canvas = document.getElementById('video-canvas');
-        const session = await cameraKit.createSession({
-          liveRenderTarget: canvas
-        });
+      window.initCameraKit = async function() {
+        try {
+          // Get your API token from: https://camera-kit.snapchat.com/
+          const apiToken = 'eyJhbGciOiJIUzI1NiIsImtpZCI6IkNhbnZhc1MyU0hNQUNQcm9kIiwidHlwIjoiSldUIn0.eyJhdWQiOiJjYW52YXMtY2FudmFzYXBpIiwiaXNzIjoiY2FudmFzLXMyc3Rva2VuIiwibmJmIjoxNzQ3NjQwOTIxLCJzdWIiOiI1YTc1ZTdkMS1mNGIxLTQyNzktYTE5Zi1mNTRlNmUyZThlZTF-U1RBR0lOR34wZDI1OTBhMS03ZTQ1LTQ3YzQtOGNiNy04YjM0OWQ0MzYwMTUifQ.xjb7h3PJeTCtyLheoFn0wywk5K36ninT18aoigb6yXE';
+          const cameraKit = await bootstrapCameraKit({ apiToken });
 
-        // 3. Get user’s webcam and turn it into a CameraKitSource
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        const source = createMediaStreamSource(stream, {
-          transform: Transform2D.None,     // or MirrorX if you want selfie behavior
-          cameraType: 'environment'         // or 'user'
-        });
-        await session.setSource(source);  
-        // :contentReference[oaicite:1]{index=1}
+          const canvas = document.getElementById('video-canvas');
+          cameraKitSession = await cameraKit.createSession({
+            liveRenderTarget: canvas
+          });
 
-        // 4. Load your Lens (by lens‑group ID) and apply it
-        const { lenses } = await cameraKit.lensRepository.loadLensGroups([
-          '46cd05e4-78b1-4661-8633-301ad575998e'
-        ]);
-        if (lenses.length) {
-          await session.applyLens(lenses[0]);
+          // Get user's webcam stream
+          const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: {
+              facingMode: window.unityFacingMode
+            }
+          });
+
+          const source = createMediaStreamSource(stream, {
+            transform: window.unityFacingMode === 'user' ? Transform2D.MirrorX : Transform2D.None,
+            cameraType: window.unityFacingMode
+          });
+
+          await cameraKitSession.setSource(source);
+
+          // Load your lens group
+          const { lenses } = await cameraKit.lensRepository.loadLensGroups([
+            '46cd05e4-78b1-4661-8633-301ad575998e' // Replace with your lens group ID
+          ]);
+
+          if (lenses.length) {
+            await cameraKitSession.applyLens(lenses[0]);
+          }
+
+          await cameraKitSession.play();
+          console.log('Camera Kit session started successfully');
+
+          // Make the stream available for Unity's webcam handling
+          const video = document.querySelector("#webcam-video");
+          video.srcObject = stream;
+          
+          return stream;
+
+        } catch (error) {
+          console.error('Camera Kit initialization failed:', error);
+          ShowError('Failed to initialize Camera Kit: ' + error.message);
+          throw error;
         }
+      };
 
-        // 5. Start rendering!
-        await session.play();
-        console.log('Camera Kit session started.');
-      } catch (e) {
-        console.error('Camera Kit error:', e);
-        alert('Failed to start Camera Kit: ' + e.message);
-      }
-    })();
-  </script>
+      // Modify the existing StartWebcam function to use Camera Kit
+      window.StartWebcam = async function() {
+        console.log("StartWebcam");
 
+        try {
+          window.webcamStream = await window.initCameraKit();
+
+          while (window.requestingForPermissions) {
+            console.log("Waiting for permissions...");
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+
+          console.log("Got Permissions");
+
+          if (window.webcamStream) {
+            const video = document.querySelector("#webcam-video");
+            try {
+              await arCamera.startWebcam(video);
+              console.log("Webcam started successfully");
+
+              window.unityInstance.SendMessage('ARCamera', 'OnStartWebcamSuccess');
+
+              const canvas = document.querySelector("#unity-canvas");
+              canvas.style.background = arCamera.UNITY_VIDEOPLANE ? "rgba(0,0,0,1)" : "rgba(0,0,0,0)";
+              
+            } catch(err) {
+              console.error("Webcam failed to start - ", err);
+              window.unityInstance.SendMessage('ARCamera', 'OnStartWebcamFail');
+            }   
+          } else {
+            console.error("Webcam failed to start - permission not yet granted");
+            window.unityInstance.SendMessage('ARCamera', 'OnStartWebcamFail');
+          }
+        } catch (error) {
+          console.error("Failed to start Camera Kit:", error);
+          ShowError("Failed to start the camera experience");
+        }
+      };
+
+      // Clean up Camera Kit when stopping webcam
+      const originalStopWebcam = window.StopWebcam;
+      window.StopWebcam = function() {
+        if (cameraKitSession) {
+          cameraKitSession.pause();
+        }
+        originalStopWebcam();
+      };
+
+      // Handle camera flipping
+      const originalFlipCam = window.FlipCam;
+      window.FlipCam = async function() {
+        if (cameraKitSession) {
+          cameraKitSession.pause();
+        }
+        await originalFlipCam();
+        await window.initCameraKit();
+      };
+    </script>
 
     <script>
       // Disable double-tap to zoom
@@ -294,49 +362,6 @@
           window.webcamStream.getTracks().forEach(track => track.stop());    
       }
 
-      async function StartWebcam(){
-          console.log("StartWebcam")
-
-          window.webcamStream = await navigator.mediaDevices.getUserMedia(window.WEBCAM_SETTINGS);
-
-          while (window.requestingForPermissions) {
-              // Wait until requestingForPermissions becomes true.
-              console.log("Waiting for permissions...");
-              await new Promise(resolve => setTimeout(resolve, 100)); // Adjust the delay time as needed.
-          }
-
-          console.log("Got Permissions");
-
-          if(window.webcamStream)
-          {
-              const video = document.querySelector("#webcam-video");
-              video.srcObject = webcamStream;
-              try {
-                  await arCamera.startWebcam(video);
-                  console.log("Webcam started successfully");
-
-                  window.unityInstance.SendMessage('ARCamera', 'OnStartWebcamSuccess');
-
-                 
-
-                  //replace background transparency
-                  const canvas = document.querySelector("#unity-canvas");
-                  let bgColor = window.getComputedStyle(canvas).backgroundColor;
-                  // canvas.style.background = bgColor.replace("rgb", "rgba").replace(")", ", 0)");
-                  canvas.style.background = arCamera.UNITY_VIDEOPLANE ? "rgba(0,0,0,1)" : "rgba(0,0,0,0)";
-                  
-              }
-              catch(err){
-                  console.error("Webcam failed to start - ", err);
-                  window.unityInstance.SendMessage('ARCamera', 'OnStartWebcamFail');
-              }   
-          }
-          else{
-              console.error("Webcam failed to start - permission not yet granted");
-              window.unityInstance.SendMessage('ARCamera', 'OnStartWebcamFail');
-          }  
-      }
-
       async function LoadWebcams(){
           let camDevices = [];
           // let backCams = [];
@@ -387,26 +412,6 @@
           window.WEBCAM_SETTINGS.video['deviceId'] = deviceId;
           //console.log(window.WEBCAM_SETTINGS);
           fTracker.WEBCAM_NAME = select.options[select.selectedIndex].innerHTML;
-      }
-
-      async function FlipCam(){
-          arCamera.stopWebcam();
-          window.WEBCAM_SETTINGS.video.deviceId = '';
-
-          if(window.WEBCAM_SETTINGS.video.facingMode == 'user'){
-              window.WEBCAM_SETTINGS.video.facingMode = 'environment';
-              arCamera.setFlipped(false);
-          }
-          else{
-              window.WEBCAM_SETTINGS.video.facingMode = 'user';
-              arCamera.setFlipped(true);
-          }
-          window.webcamStream = await navigator.mediaDevices.getUserMedia(window.WEBCAM_SETTINGS);
-
-          const video = document.querySelector("#webcam-video");
-          video.srcObject = webcamStream;
-
-          await arCamera.startWebcam(video);
       }
 
       async function IsCameraPermissionGranted() {
