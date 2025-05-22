@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="TemplateData/style.css">
     <link rel="manifest" href="manifest.webmanifest">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@snap/camera-kit@1.5.0/dist/bundle.js"></script>
 
     <style>
       body { font-family: 'Roboto', sans-serif; letter-spacing: 0.05em; font-size: max(2vw, 2vh); color:white}
@@ -37,8 +38,8 @@
               <line x1="3" y1="21" x2="21" y2="3" stroke="#999" stroke-width="2.5"></line>
             </svg>
           </button> 
-          <p style="font-size: max(1vw, 1vh); color: #fff6" >Press and hold to save or share this screenshot</p>
-          </div>
+          <p style="font-size: max(1vw, 1vh); color: #fff6">Press and hold to save or share this screenshot</p>
+        </div>
     </div>
     <div id="confirmUrlDiv" style="display: none; opacity: 0;" class="ctaDiv">
         <div style="position:relative; background-color:#2c2b2f; padding:10px; box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.3), 0 6px 20px 0 rgba(0, 0, 0, 0.25); width: min(80vw,80vh); display:flex; flex-direction: column; align-items: center; border-radius: 1.5vh;">
@@ -65,13 +66,7 @@
     <script src="arcamera.js" type="text/javascript"></script>
     <script src="ftracker.js" type="text/javascript"></script>
 
-    <script type="module">
-      import {
-        bootstrapCameraKit,
-        createMediaStreamSource,
-        Transform2D
-      } from 'https://cdn.jsdelivr.net/npm/@snap/camera-kit@1.5.0/dist/index.js';
-
+    <script>
       let cameraKitSession = null;
       let cameraKit = null;
 
@@ -79,32 +74,31 @@
         try {
           if (!cameraKit) {
             const apiToken = 'eyJhbGciOiJIUzI1NiIsImtpZCI6IkNhbnZhc1MyU0hNQUNQcm9kIiwidHlwIjoiSldUIn0.eyJhdWQiOiJjYW52YXMtY2FudmFzYXBpIiwiaXNzIjoiY2FudmFzLXMyc3Rva2VuIiwibmJmIjoxNzQ3NjQwOTIxLCJzdWIiOiI1YTc1ZTdkMS1mNGIxLTQyNzktYTE5Zi1mNTRlNmUyZThlZTF-U1RBR0lOR34wZDI1OTBhMS03ZTQ1LTQ3YzQtOGNiNy04YjM0OWQ0MzYwMTUifQ.xjb7h3PJeTCtyLheoFn0wywk5K36ninT18aoigb6yXE';
-            cameraKit = await bootstrapCameraKit({ apiToken });
+            cameraKit = await window.CAMERA_KIT.createCameraKit({ apiToken });
           }
 
           const canvas = document.getElementById('video-canvas');
           
           if (cameraKitSession) {
             await cameraKitSession.pause();
+            await cameraKitSession.dispose();
           }
           
-          cameraKitSession = await cameraKit.createSession({
-            liveRenderTarget: canvas
-          });
+          cameraKitSession = await cameraKit.createSession({ liveRenderTarget: canvas });
 
-          const source = createMediaStreamSource(stream, {
-            transform: window.unityFacingMode === 'user' ? Transform2D.MirrorX : Transform2D.None,
+          const source = await window.CAMERA_KIT.createMediaStreamSource(stream, {
+            transform: window.unityFacingMode === 'user' ? window.CAMERA_KIT.Transform2D.MirrorX : window.CAMERA_KIT.Transform2D.None,
             cameraType: window.unityFacingMode
           });
 
           await cameraKitSession.setSource(source);
 
-          const { lenses } = await cameraKit.lensRepository.loadLensGroups([
-            '46cd05e4-78b1-4661-8633-301ad575998e' // Replace with your lens group ID
-          ]);
-
-          if (lenses.length) {
+          const { lenses } = await cameraKit.lensRepository.loadLensGroups(['46cd05e4-78b1-4661-8633-301ad575998e']);
+          
+          if (lenses && lenses.length > 0) {
             await cameraKitSession.applyLens(lenses[0]);
+          } else {
+            console.error('No lenses found in the group');
           }
 
           await cameraKitSession.play();
@@ -171,13 +165,12 @@
       window.FlipCam = async function() {
         if (cameraKitSession) {
           await cameraKitSession.pause();
+          await cameraKitSession.dispose();
         }
         await originalFlipCam();
         await window.initCameraKit(window.webcamStream);
       };
-    </script>
 
-    <script>
       document.addEventListener('touchstart', function (event) {
         if (event.touches.length > 1) {
           event.preventDefault();
@@ -194,21 +187,20 @@
         window.arCamera = new ARCamera(unityCanvas, videoCanvas);
         window.fTracker = new FaceTracker(arCamera);
         try{
-					var numFaces = 4;
-            
-                    await window.fTracker.initialize(
-                        "./opencv.js",
-                        "./mediapipe/tasks-vision@0.10.3.js",
-                        "./mediapipe/wasm",
-                        "./mediapipe/face_landmarker.task",
-                        numFaces);
+          var numFaces = 4;
+          await window.fTracker.initialize(
+              "./opencv.js",
+              "./mediapipe/tasks-vision@0.10.3.js",
+              "./mediapipe/wasm",
+              "./mediapipe/face_landmarker.task",
+              numFaces);
 
-                    console.log("FaceTracker initialized!");
+          console.log("FaceTracker initialized!");
         }
         catch (error){
-            console.error("Failed to initialize FaceTracker. Are you missing opencv.js? " + error);
-            ShowError("Failed to initialize the experience.");
-            return;
+          console.error("Failed to initialize FaceTracker. Are you missing opencv.js? " + error);
+          ShowError("Failed to initialize the experience.");
+          return;
         }
 
         await LoadWebcams();
@@ -335,7 +327,6 @@
           var ctr = 0;
           devices.forEach(mediaDevice => {
               if (mediaDevice.kind === 'videoinput') {
-
                   if(window.unityFacingMode == 'environment' && !mediaDevice.label.includes('facing front')){
                       camDevices.push(mediaDevice);
                   }
@@ -345,7 +336,6 @@
                   else{
                       camDevices.push(mediaDevice);
                   }   
-                  
                   ctr++;
               }
           });
@@ -367,6 +357,7 @@
           });
           fTracker.WEBCAM_NAME = select.options[select.selectedIndex].innerHTML;
       }
+
       function SelectCam(){
           var select = document.getElementById("chooseCamSel");
           window.deviceId = select.value;
