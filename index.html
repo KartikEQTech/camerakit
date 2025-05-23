@@ -1,1 +1,71 @@
-  
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Unity WebGL Player | AvvaiAR</title>
+    <link rel="shortcut icon" href="TemplateData/favicon.ico">
+    <link rel="stylesheet" href="TemplateData/style.css">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@snap/camera-kit@1.5.0/dist/bundle.js"></script>
+
+    <style>
+      body { font-family: 'Roboto', sans-serif; letter-spacing: 0.05em; font-size: max(2vw, 2vh); color:white}
+      button {height:max(5vw, 5vh);font-size: max(2vw, 2vh);font-weight: bold; border-radius: max(1.5vw, 1.5vh); padding-left: max(5vw, 5vh); padding-right: max(5vw, 5vh); border: 0; color: #62a7fe; background: #3d3d3d; transition:0.1s;user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; }
+      button:hover { filter: brightness(1.15)}
+      button:active { transform: scale(0.95); filter: brightness(0.85)}
+      .ctaDiv { display: flex; flex-direction: column; align-items: center; justify-content: center; position: absolute; left: 0; right: 0; top: 0; bottom: 0; background: #2f2e32aa; z-index: 99; transition: 0.5s;}
+    </style>
+  </head>
+  <body>
+    <video id="webcam-video" muted autoplay playsinline style="width:1px;position:absolute"></video>
+    <canvas id="video-canvas" style="width:100%; height:100%; object-fit:cover; position:absolute"></canvas>
+    <div id="unity-container">
+      <canvas id="unity-canvas" width=960 height=600 tabindex="-1"></canvas>
+      <div id="unity-loading-bar">
+        <div id="unity-logo"></div>
+        <div id="unity-progress-bar-empty">
+          <div id="unity-progress-bar-full"></div>
+        </div>
+      </div>
+      <div id="unity-warning"> </div>
+    </div>
+
+    <script src="arcamera.js"></script>
+    <script src="ftracker.js"></script>
+    <script src="cameraKit.js"></script>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', async () => {
+        try {
+          await window.cameraKit.initialize();
+          
+          // Example: Apply a lens after initialization
+          const lensId = '46cd05e4-78b1-4661-8633-301ad575998e';
+          const groupId = 'eda0b84b-0b74-49a4-be48-eb6fc49d98b1';
+          await window.cameraKit.applyLens(lensId, groupId);
+        } catch (error) {
+          console.error('Failed to setup Camera Kit:', error);
+        }
+      });
+
+      // Clean up Camera Kit when the page is unloaded
+      window.addEventListener('beforeunload', () => {
+        window.cameraKit.cleanup();
+      });
+
+      // Your existing Unity initialization code here...
+      var initialize = async() => {
+        var unityCanvas = document.querySelector("#unity-canvas");
+        var videoCanvas = document.querySelector("#video-canvas");
+        window.arCamera = new ARCamera(unityCanvas, videoCanvas);
+        window.fTracker = new FaceTracker(arCamera);
+        // ... rest of your initialization code
+      };
+
+      initialize();
+    </script>
+  </body>
+</html>
